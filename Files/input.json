@@ -47,5 +47,23 @@
     "Level": 2,
     "HP": 8,
     "Treasure": null
+  },
+  {
+    "$type": "Rat",
+    "Name": "Biggie Cheese",
+    "Type": "Rat",
+    "Level": 1,
+    "HP": 4,
+    "Treasure": null
+  },
+  {
+    "$type": "Sludge",
+    "Name": "Gooey Gary",
+    "Type": "Sludge",
+    "Level": 6,
+    "HP": 11,
+    "Treasure": "Slimey Necklace"
   }
+
+
 ]

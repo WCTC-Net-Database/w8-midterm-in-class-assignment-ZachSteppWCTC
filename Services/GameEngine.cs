@@ -1,4 +1,6 @@
-﻿using W8_assignment_template.Data;
+﻿using System.ComponentModel.Design;
+using System.Reflection.Emit;
+using W8_assignment_template.Data;
 using W8_assignment_template.Helpers;
 using W8_assignment_template.Interfaces;
 using W8_assignment_template.Models.Characters;
@@ -15,6 +17,8 @@ public class GameEngine
     private readonly IRoomFactory _roomFactory;
     private ICharacter _player;
     private ICharacter _goblin;
+    private ICharacter _rat;
+    private ICharacter _sludge;
 
     private List<IRoom> _rooms;
 
@@ -41,13 +45,72 @@ public class GameEngine
         // TODO e.g. "Which monster would you like to attack?"
         // TODO Right now it just attacks the first monster in the room.
         // TODO It is ok to leave this functionality if there is only one monster in the room.
-        var target = _player.CurrentRoom.Characters.FirstOrDefault(c => c != _player);
-        if (target != null)
+
+        // Keeping this functionality for only one monster, allowing for the character to cancel their attack if decided.
+        var targets = _player.CurrentRoom.Characters;
+        if (targets != null && targets.Count != 0)
         {
-            _player.Attack(target);
+            _outputManager.Clear();
+            _outputManager.WriteLine("Select your target to attack.", ConsoleColor.Cyan);
+
+            int targetselection = 0;
+            while (true)
+            {
+                if (targets.Count == 0)
+                {
+                    // If there are no enemies left...
+                    _outputManager.WriteLine($"{_player.CurrentRoom.Name} has been cleared of enemies.", ConsoleColor.Green);
+                    break;
+                }
+                else
+                {
+                    _outputManager.WriteLine($"0. Cancel Attack");
+                    for (int i = 1; i < targets.Count + 1; i++)
+                    {
+                        _outputManager.WriteLine($"{i}. {targets[i - 1].Name}");
+                    }
+                    _outputManager.Display();
+                    // Prevents errors in user input, looking for an integer relating to the list of enemies.
+                    try
+                    {
+                        targetselection = Convert.ToInt32(Console.ReadLine());
+                        if (targetselection == 0)
+                        {
+                            _outputManager.Clear();
+                            _outputManager.WriteLine($"{_player.Name} steps away from the fight.", ConsoleColor.Green);
+                            // Reprints the characters still in the room after leaving a fight, using targets list. Could make a new method for this feature if it is used more. 
+                            foreach (var target in targets)
+                            {
+                                _outputManager.WriteLine($"{target.Name} is here.", ConsoleColor.Red);
+                            }
+                            break;
+                        }
+                        // Checks if input is outside of range
+                        else if (targetselection > targets.Count)
+                        {
+                            _outputManager.Clear();
+                            _outputManager.WriteLine("Select your target to attack. Please enter an integer for one of the characters present.", ConsoleColor.Cyan);
+                        }
+                        // Attacks present target if user input is correct
+                        else
+                        {
+                            _outputManager.Clear();
+                            _player.Attack(targets[targetselection - 1]);
+                            _player.CurrentRoom.RemoveCharacter(targets[targetselection - 1]);
+                        }
+                    }
+                    catch (FormatException)
+                    {
+                        _outputManager.Clear();
+                        _outputManager.WriteLine("Select your target to attack. Please enter an integer.", ConsoleColor.Cyan);
+                    }
+                }
+            }
         }
         else
         {
+            // Likely won't be accessed, but here for completion. Same as text in gameloop.
+            _outputManager.Clear();
             _outputManager.WriteLine("No characters to attack.", ConsoleColor.Red);
         }
     }
@@ -97,6 +160,7 @@ public class GameEngine
                     }
                     else
                     {
+                        _outputManager.Clear();
                         _outputManager.WriteLine("No characters to attack.", ConsoleColor.Red);
                     }
 
@@ -124,10 +188,14 @@ public class GameEngine
     private void LoadMonsters()
     {
         _goblin = _context.Characters.OfType<Goblin>().FirstOrDefault();
+        _rat = _context.Characters.OfType<Rat>().FirstOrDefault();
+        _sludge = _context.Characters.OfType<Sludge>().FirstOrDefault();
 
         var random = new Random();
         var randomRoom = _rooms[random.Next(_rooms.Count)];
         randomRoom.AddCharacter(_goblin); // Use helper method
+        _rooms[0].North.North.AddCharacter(_rat);
+        _rooms[0].North.North.AddCharacter(_sludge);
 
         // TODO Load your two new monsters here into the same room
     }
@@ -159,6 +227,8 @@ public class GameEngine
         var library = _roomFactory.CreateRoom("library", _outputManager);
         var armory = _roomFactory.CreateRoom("armory", _outputManager);
         var garden = _roomFactory.CreateRoom("garden", _outputManager);
+        var storage = _roomFactory.CreateRoom("storage", _outputManager);
+        var sewer = _roomFactory.CreateRoom("sewer", _outputManager);
 
         entrance.North = treasureRoom;
         entrance.West = library;
@@ -166,8 +236,15 @@ public class GameEngine
 
         treasureRoom.South = entrance;
         treasureRoom.West = dungeonRoom;
+        treasureRoom.North = sewer;
+        treasureRoom.East = storage;
 
         dungeonRoom.East = treasureRoom;
+        
+        sewer.South = treasureRoom;
+
+        storage.West = treasureRoom;
+        storage.South = garden;
 
         library.East = entrance;
         library.South = armory;
@@ -175,6 +252,7 @@ public class GameEngine
         armory.North = library;
 
         garden.West = entrance;
+        garden.North = storage;
 
         // Store rooms in a list for later use
         _rooms = new List<IRoom> { entrance, treasureRoom, dungeonRoom, library, armory, garden };
